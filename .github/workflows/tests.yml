@@ -1,0 +1,47 @@
+name: tests
+
+# Controls when the workflow will run
+on:
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  test:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+          php: ["8.1", "8.0", "7.4", "7.3"]
+          laravel: ["^9.0", "^8.0", "^7.0", "^5.5"]
+          dependency-version: [prefer-stable]
+
+    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.dependency-version }}
+
+    steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+
+        - name: Cache dependencies
+          uses: actions/cache@v2
+          with:
+              path: ~/.composer/cache/files
+              key: dependencies-laravel-${{ matrix.laravel }}-php-${{ matrix.php }}-composer-${{ hashFiles('composer.json') }}
+
+        - name: Setup PHP
+          uses: shivammathur/setup-php@v2
+          with:
+              php-version: ${{ matrix.php }}
+              extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, mysql, mysqli, pdo_mysql, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
+              coverage: none
+
+        - name: Install dependencies
+          run: |
+              composer require "laravel/framework:${{ matrix.laravel }}" --dev --no-interaction --no-update
+              composer update --${{ matrix.dependency-version }} --prefer-dist --no-interaction
+        - name: Execute tests
+          run: vendor/bin/phpunit
